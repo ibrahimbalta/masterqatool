@@ -60,6 +60,34 @@ export default function TestCaseStudioPage() {
     return tc.category.toLowerCase() === selectedCategory.toLowerCase();
   });
 
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleGenerateAI = async () => {
+    if (!selectedProjectId) return;
+    setIsGenerating(true);
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/projects/${selectedProjectId}/test-cases/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${api.getToken()}`,
+        },
+      });
+      if (res.ok) {
+        const newCases = await res.json();
+        setTestCases((prev) => [...newCases, ...prev]);
+        alert(`Successfully generated ${newCases.length} AI test scenarios!`);
+      } else {
+        const err = await res.json();
+        alert(err.detail || 'Failed to generate test cases');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Error communicating with AI service');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleApprove = async (caseId: string) => {
     try {
       const updated = await api.updateTestCase(caseId, { approval_status: 'approved' });
@@ -79,6 +107,16 @@ export default function TestCaseStudioPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {selectedProjectId && (
+            <button
+              onClick={handleGenerateAI}
+              disabled={isGenerating}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg bg-brand-orange hover:bg-brand-orangeHover text-white text-xs font-medium shadow-md shadow-brand-orange/20 disabled:opacity-50 transition-all"
+            >
+              {isGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+              <span>Generate with AI</span>
+            </button>
+          )}
           {selectedProjectId && (
             <a
               href={api.getExportCsvUrl(selectedProjectId)}

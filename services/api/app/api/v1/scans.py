@@ -1,23 +1,31 @@
 import uuid
 from typing import List
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.api.app.db.session import get_db
+from services.api.app.db.session import get_db, AsyncSessionLocal
 from services.api.app.models.project import Project, ProjectScan, DiscoveredPage
 from services.api.app.models.user import OrganizationMember
 from services.api.app.schemas.scan import ScanCreate, ScanRead
 from services.api.app.security.deps import get_current_organization_membership, require_role
+from services.api.app.services.discovery import WebDiscoveryService
 
 router = APIRouter(prefix="/projects/{project_id}/scans", tags=["Web Discovery & Scans"])
+
+async def run_discovery_task(scan_id: uuid.UUID, allow_private_dev: bool = False):
+    async with AsyncSessionLocal() as session:
+        service = WebDiscoveryService(session)
+        await service.run_discovery(scan_id, allow_private_dev=allow_private_dev)
 
 @router.post("", response_model=ScanRead, status_code=status.HTTP_202_ACCEPTED)
 async def start_scan(
     project_id: uuid.UUID,
     scan_in: ScanCreate,
+    background_tasks: BackgroundTasks,
+    sync: bool = Query(False, description="Run synchronously for immediate testing results"),
     membership: OrganizationMember = Depends(require_role(["owner", "admin", "member"])),
     db: AsyncSession = Depends(get_db)
 ):
@@ -42,6 +50,19 @@ async def start_scan(
     db.add(scan)
     await db.commit()
     await db.refresh(scan)
+
+    if sync:
+        service = WebDiscoveryService(db)
+        await service.run_discovery(scan.id)
+        stmt = (
+            select(ProjectScan)
+            .options(selectinload(ProjectScan.discovered_pages))
+            .where(ProjectScan.id == scan.id)
+        )
+        return (await db.execute(stmt)).scalar_one()
+    else:
+        background_tasks.add_task(run_discovery_task, scan.id)
+
     return scan
 
 @router.get("", response_model=List[ScanRead])
@@ -61,6 +82,7 @@ async def list_scans(
 
     stmt = (
         select(ProjectScan)
+        .options(selectinload(ProjectScan.discovered_pages))
         .where(ProjectScan.project_id == project_id)
         .order_by(ProjectScan.created_at.desc())
     )

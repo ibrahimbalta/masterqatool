@@ -1,12 +1,12 @@
 import uuid
 from typing import List, Optional
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from services.api.app.db.session import get_db
+from services.api.app.db.session import get_db, AsyncSessionLocal
 from services.api.app.models.project import Project
 from services.api.app.models.test_suite import TestCase
 from services.api.app.models.test_run import TestRun, TestResult, TestStep
@@ -14,12 +14,20 @@ from services.api.app.models.user import OrganizationMember
 from services.api.app.models.subscription import AuditLog
 from services.api.app.schemas.test_run import TestRunCreate, TestRunRead
 from services.api.app.security.deps import get_current_organization_membership, require_role
+from services.worker.app.browser.runner import PlaywrightRunner
 
 router = APIRouter(tags=["Test Runs & Execution"])
+
+async def run_browser_task(run_id: uuid.UUID, allow_private_dev: bool = False):
+    async with AsyncSessionLocal() as session:
+        runner = PlaywrightRunner(session)
+        await runner.execute_test_run(run_id, allow_private_dev=allow_private_dev)
 
 @router.post("/test-runs", response_model=TestRunRead, status_code=status.HTTP_202_ACCEPTED)
 async def trigger_test_run(
     run_in: TestRunCreate,
+    background_tasks: BackgroundTasks,
+    sync: bool = Query(False, description="Run synchronously for immediate verification"),
     membership: OrganizationMember = Depends(require_role(["owner", "admin", "member"])),
     db: AsyncSession = Depends(get_db)
 ):
@@ -83,7 +91,20 @@ async def trigger_test_run(
     db.add(audit)
     await db.commit()
 
-    # Refresh with preloaded results
+    if sync:
+        runner = PlaywrightRunner(db)
+        await runner.execute_test_run(test_run.id)
+        stmt = (
+            select(TestRun)
+            .options(selectinload(TestRun.results).selectinload(TestResult.steps))
+            .options(selectinload(TestRun.results).selectinload(TestResult.artifacts))
+            .where(TestRun.id == test_run.id)
+        )
+        return (await db.execute(stmt)).scalar_one()
+    else:
+        background_tasks.add_task(run_browser_task, test_run.id)
+
+    # Return queued representation
     stmt = (
         select(TestRun)
         .options(selectinload(TestRun.results).selectinload(TestResult.steps))
