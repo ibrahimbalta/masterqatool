@@ -11,6 +11,7 @@ export default function ExecutionCenterPage() {
   const [runs, setRuns] = useState<TestRun[]>([]);
   const [activeRun, setActiveRun] = useState<TestRun | null>(null);
   const [loading, setLoading] = useState(true);
+  const [triggering, setTriggering] = useState(false);
   const [applyingRepairId, setApplyingRepairId] = useState<string | null>(null);
   const [previewArtifact, setPreviewArtifact] = useState<{ id: string; type: string } | null>(null);
 
@@ -19,7 +20,7 @@ export default function ExecutionCenterPage() {
     try {
       await api.updateLocatorRepair(repairId, 'applied');
       if (selectedProjectId) {
-        await loadRuns(selectedProjectId);
+        await loadRuns(selectedProjectId, true);
       }
     } catch (err: any) {
       alert(err.message || 'Failed to apply locator repair');
@@ -32,7 +33,13 @@ export default function ExecutionCenterPage() {
     api.getProjects().then((projs) => {
       setProjects(projs);
       if (projs.length > 0) {
-        setSelectedProjectId(projs[0].id);
+        const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const targetProjId = urlParams?.get('projectId');
+        if (targetProjId && projs.some((p) => p.id === targetProjId)) {
+          setSelectedProjectId(targetProjId);
+        } else {
+          setSelectedProjectId(projs[0].id);
+        }
       }
     });
   }, []);
@@ -45,21 +52,52 @@ export default function ExecutionCenterPage() {
     }
   }, [selectedProjectId]);
 
-  const loadRuns = async (projId: string) => {
-    setLoading(true);
+  // Real-time polling when test runs are queued or in execution
+  useEffect(() => {
+    const hasActiveRun = runs.some((r) => r.status === 'queued' || r.status === 'running');
+    if (!hasActiveRun || !selectedProjectId) return;
+
+    const interval = setInterval(() => {
+      loadRuns(selectedProjectId, true);
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [runs, selectedProjectId]);
+
+  const loadRuns = async (projId: string, silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const data = await api.getTestRuns(projId);
       setRuns(data);
       if (data.length > 0) {
-        setActiveRun(data[0]);
+        setActiveRun((prev) => {
+          if (!prev) return data[0];
+          const matched = data.find((r) => r.id === prev.id);
+          return matched || data[0];
+        });
       } else {
         setActiveRun(null);
       }
     } catch {
-      setRuns([]);
-      setActiveRun(null);
+      if (!silent) {
+        setRuns([]);
+        setActiveRun(null);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+    }
+  };
+
+  const handleTriggerRun = async () => {
+    if (!selectedProjectId) return;
+    setTriggering(true);
+    try {
+      await api.triggerTestRun(selectedProjectId);
+      await loadRuns(selectedProjectId, true);
+    } catch (err: any) {
+      alert(err.message || 'Failed to trigger test run');
+    } finally {
+      setTriggering(false);
     }
   };
 
@@ -84,7 +122,15 @@ export default function ExecutionCenterPage() {
             Isolated browser execution status, step logs, screenshots, and Playwright traces.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            disabled={triggering || !selectedProjectId}
+            onClick={handleTriggerRun}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-brand-orange hover:bg-brand-orangeHover text-white text-xs font-medium shadow-md shadow-brand-orange/20 transition-all disabled:opacity-50"
+          >
+            {triggering ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PlaySquare className="w-3.5 h-3.5" />}
+            <span>{triggering ? 'Queuing Run...' : 'Run Playwright'}</span>
+          </button>
           <button
             onClick={() => selectedProjectId && loadRuns(selectedProjectId)}
             className="flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-200 hover:bg-surface-100 border border-border text-xs font-medium text-zinc-200 transition-colors"
@@ -217,6 +263,23 @@ export default function ExecutionCenterPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Live Real-time Running Alert */}
+              {['queued', 'running', 'starting'].includes(activeRun.status) && (
+                <div className="p-4 rounded-xl bg-brand-orange/10 border border-brand-orange/30 flex items-center gap-3 animate-pulse">
+                  <Loader2 className="w-5 h-5 text-brand-orange animate-spin shrink-0" />
+                  <div className="text-xs">
+                    <p className="font-semibold text-white font-mono">
+                      {activeRun.status === 'running'
+                        ? '⚡ Playwright isolated browser execution in progress...'
+                        : '⏳ Test run queued in background execution worker...'}
+                    </p>
+                    <p className="text-zinc-400 mt-0.5 text-[11px]">
+                      Auto-refreshing every 2 seconds. Steps, screenshots, and self-healing fixes will update live.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Granular Step Results */}
               <div className="p-5 rounded-xl bg-surface-200 border border-border space-y-4">

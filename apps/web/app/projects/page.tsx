@@ -1,15 +1,18 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { FolderKanban, Plus, Globe, Github, ExternalLink, Play, Search, Loader2 } from 'lucide-react';
 import { api, Project } from '@/lib/api';
 import { ProjectWizardModal } from '@/components/ProjectWizardModal';
 
 export default function ProjectsPage() {
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [runningProjectId, setRunningProjectId] = useState<string | null>(null);
 
   useEffect(() => {
     loadProjects();
@@ -135,18 +138,30 @@ export default function ProjectsPage() {
                 Created {new Date(project.created_at).toLocaleDateString()}
               </span>
               <button
+                disabled={runningProjectId === project.id}
                 onClick={async () => {
+                  setRunningProjectId(project.id);
                   try {
                     await api.triggerTestRun(project.id);
-                    alert('Test run queued successfully! View in Execution Center.');
+                    router.push(`/execution?projectId=${project.id}`);
                   } catch (e: any) {
                     alert(e.message || 'Error triggering run');
+                    setRunningProjectId(null);
                   }
                 }}
-                className="px-3 py-1.5 rounded-lg bg-surface-100 hover:bg-surface-50 border border-border text-xs font-medium text-brand-orange flex items-center gap-1.5 transition-colors"
+                className="px-3 py-1.5 rounded-lg bg-surface-100 hover:bg-surface-50 border border-border text-xs font-medium text-brand-orange flex items-center gap-1.5 transition-colors disabled:opacity-50"
               >
-                <Play className="w-3 h-3" />
-                <span>Run Playwright</span>
+                {runningProjectId === project.id ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>Starting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3 h-3" />
+                    <span>Run Playwright</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
