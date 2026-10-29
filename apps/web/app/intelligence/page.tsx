@@ -75,8 +75,9 @@ export default function ProjectIntelligencePage() {
   const loadScans = async (projId: string) => {
     setLoading(true);
     try {
+      const token = await api.ensureAuth();
       const res = await fetch(`${api.getBaseUrl()}/projects/${projId}/scans`, {
-        headers: { Authorization: `Bearer ${api.getToken()}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
@@ -84,7 +85,7 @@ export default function ProjectIntelligencePage() {
         if (data.length > 0) {
           // Fetch full scan details including discovered pages
           const detailRes = await fetch(`${api.getBaseUrl()}/projects/${projId}/scans/${data[0].id}`, {
-            headers: { Authorization: `Bearer ${api.getToken()}` },
+            headers: { Authorization: `Bearer ${token}` },
           });
           if (detailRes.ok) {
             setActiveScan(await detailRes.json());
@@ -105,11 +106,12 @@ export default function ProjectIntelligencePage() {
     if (!selectedProjectId) return;
     setIsScanning(true);
     try {
+      const token = await api.ensureAuth();
       const res = await fetch(`${api.getBaseUrl()}/projects/${selectedProjectId}/scans?sync=true`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${api.getToken()}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ scan_type: 'url_crawler', max_pages: 10 }),
       });

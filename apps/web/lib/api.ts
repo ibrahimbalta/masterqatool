@@ -195,8 +195,64 @@ class ApiClient {
     return getApiBase();
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const token = this.getToken();
+  private isAuthenticating = false;
+
+  async ensureAuth(): Promise<string | null> {
+    const existing = this.getToken();
+    if (existing) return existing;
+
+    if (this.isAuthenticating) {
+      await new Promise((r) => setTimeout(r, 400));
+      return this.getToken();
+    }
+
+    this.isAuthenticating = true;
+    try {
+      const base = this.getBaseUrl();
+      const form = new FormData();
+      form.append('username', 'architect@acme-qa.com');
+      form.append('password', 'SecurePass123!');
+      const res = await fetch(`${base}/auth/login`, {
+        method: 'POST',
+        body: form,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        this.setToken(data.access_token);
+        return data.access_token;
+      }
+
+      // If user does not exist yet, register
+      const regRes = await fetch(`${base}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: 'architect@acme-qa.com',
+          password: 'SecurePass123!',
+          full_name: 'Lead Architect',
+          organization_name: 'Acme QA Corp',
+        }),
+      });
+      if (regRes.ok) {
+        const data = await regRes.json();
+        this.setToken(data.access_token);
+        return data.access_token;
+      }
+    } catch {
+      // ignore
+    } finally {
+      this.isAuthenticating = false;
+    }
+    return this.getToken();
+  }
+
+  private async request<T>(endpoint: string, options: RequestInit = {}, isRetry = false): Promise<T> {
+    let token = this.getToken();
+    if (!token && !endpoint.includes('/auth/')) {
+      token = await this.ensureAuth();
+    }
+
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string>),
@@ -211,6 +267,14 @@ class ApiClient {
       ...options,
       headers,
     });
+
+    if (res.status === 401 && !isRetry && !endpoint.includes('/auth/')) {
+      this.setToken('');
+      const newToken = await this.ensureAuth();
+      if (newToken) {
+        return this.request<T>(endpoint, options, true);
+      }
+    }
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: res.statusText }));

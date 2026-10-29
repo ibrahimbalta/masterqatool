@@ -66,11 +66,12 @@ export default function TestCaseStudioPage() {
     if (!selectedProjectId) return;
     setIsGenerating(true);
     try {
+      const token = await api.ensureAuth();
       const res = await fetch(`${api.getBaseUrl()}/projects/${selectedProjectId}/test-cases/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${api.getToken()}`,
+          Authorization: `Bearer ${token}`,
         },
       });
       if (res.ok) {

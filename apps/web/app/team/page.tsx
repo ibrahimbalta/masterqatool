@@ -23,19 +23,21 @@ export default function TeamWorkspacePage() {
         // Fetch runs or usage to get orgId
         api.getUsage().then(() => {
           // Fallback to fetch orgs directly
-          fetch(`${api.getBaseUrl()}/organizations`, {
-            headers: { Authorization: `Bearer ${api.getToken()}` },
-          })
-            .then((r) => r.json())
-            .then((orgs) => {
-              if (orgs.length > 0) {
-                setOrgId(orgs[0].id);
-                loadMembers(orgs[0].id);
-              } else {
-                setLoading(false);
-              }
+          api.ensureAuth().then((token) => {
+            fetch(`${api.getBaseUrl()}/organizations`, {
+              headers: { Authorization: `Bearer ${token}` },
             })
-            .catch(() => setLoading(false));
+              .then((r) => r.json())
+              .then((orgs) => {
+                if (orgs.length > 0) {
+                  setOrgId(orgs[0].id);
+                  loadMembers(orgs[0].id);
+                } else {
+                  setLoading(false);
+                }
+              })
+              .catch(() => setLoading(false));
+          });
         });
       } else {
         setLoading(false);
