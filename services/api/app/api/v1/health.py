@@ -5,6 +5,7 @@ from services.api.app.db.session import get_db
 
 router = APIRouter(tags=["Health & Probes"])
 
+@router.get("/health", status_code=status.HTTP_200_OK)
 @router.get("/healthz", status_code=status.HTTP_200_OK)
 async def healthz():
     return {"status": "ok", "service": "ai-qa-agent-api"}
