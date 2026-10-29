@@ -381,6 +381,15 @@ class ApiClient {
     });
   }
 
+  // Artifacts & Evidence
+  getArtifactFileUrl(artifactId: string): string {
+    return `${API_BASE}/artifacts/${artifactId}/file`;
+  }
+
+  async getArtifact(artifactId: string): Promise<any> {
+    return this.request<any>(`/artifacts/${artifactId}`);
+  }
+
   // Usage
   async getUsage(): Promise<UsageSummary> {
     return this.request<UsageSummary>('/usage');

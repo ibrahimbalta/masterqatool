@@ -12,6 +12,7 @@ export default function ExecutionCenterPage() {
   const [activeRun, setActiveRun] = useState<TestRun | null>(null);
   const [loading, setLoading] = useState(true);
   const [applyingRepairId, setApplyingRepairId] = useState<string | null>(null);
+  const [previewArtifact, setPreviewArtifact] = useState<{ id: string; type: string } | null>(null);
 
   const handleApplyRepair = async (repairId: string) => {
     setApplyingRepairId(repairId);
@@ -328,15 +329,17 @@ export default function ExecutionCenterPage() {
 
                         {/* Artifacts (Screenshots, traces) */}
                         {res.artifacts.length > 0 && (
-                          <div className="pt-2 flex items-center gap-2">
+                          <div className="pt-2 flex items-center gap-2 flex-wrap">
                             {res.artifacts.map((art) => (
-                              <div
+                              <button
                                 key={art.id}
-                                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-200 border border-border text-[11px] text-zinc-300 font-mono"
+                                onClick={() => setPreviewArtifact({ id: art.id, type: art.artifact_type })}
+                                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-surface-200 hover:bg-surface-100 border border-border text-[11px] text-zinc-300 font-mono transition-all cursor-pointer"
                               >
                                 <Camera className="w-3.5 h-3.5 text-brand-orange" />
                                 <span>{art.artifact_type}</span>
-                              </div>
+                                <span className="text-brand-orange text-[10px]">View</span>
+                              </button>
                             ))}
                           </div>
                         )}
@@ -347,6 +350,45 @@ export default function ExecutionCenterPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Screenshot / Artifact Preview Modal */}
+      {previewArtifact && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-surface-300 border border-border rounded-xl p-4 max-w-4xl w-full shadow-2xl space-y-3">
+            <div className="flex items-center justify-between border-b border-border pb-2.5">
+              <span className="text-xs font-semibold text-white font-mono flex items-center gap-2">
+                <Camera className="w-4 h-4 text-brand-orange" />
+                Execution Evidence: {previewArtifact.type}
+              </span>
+              <div className="flex items-center gap-2">
+                <a
+                  href={api.getArtifactFileUrl(previewArtifact.id)}
+                  target="_blank"
+                  rel="noreferrer"
+                  download
+                  className="px-2.5 py-1 rounded bg-surface-200 hover:bg-surface-100 text-zinc-200 text-xs font-medium border border-border"
+                >
+                  Download
+                </a>
+                <button
+                  onClick={() => setPreviewArtifact(null)}
+                  className="text-zinc-400 hover:text-white text-xs px-2 py-1"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center p-2 bg-[#090614] rounded-lg border border-border overflow-hidden min-h-[300px] max-h-[70vh]">
+              <img
+                src={api.getArtifactFileUrl(previewArtifact.id)}
+                alt="Test Evidence Screenshot"
+                className="max-h-[65vh] object-contain rounded"
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
