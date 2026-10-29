@@ -15,6 +15,7 @@ from services.api.app.models.project import Project
 from services.api.app.models.bug import Bug
 from services.api.app.models.subscription import UsageRecord
 from services.worker.app.browser.self_healing import SelfHealingAssistant
+from services.api.app.services.storage import storage_service
 
 logger = logging.getLogger("playwright_runner")
 
@@ -245,10 +246,17 @@ class PlaywrightRunner:
                     with open(screenshot_path, "wb") as f:
                         f.write(b"SIMULATED_SCREENSHOT_IMAGE_BYTES")
 
+                # Upload to Cloudflare R2 if configured, otherwise local disk
+                storage_dest = storage_service.upload_file(
+                    screenshot_path,
+                    destination_key=f"screenshots/{screenshot_filename}",
+                    content_type="image/png"
+                )
+
                 artifact = Artifact(
                     test_result_id=result.id,
                     artifact_type="screenshot",
-                    storage_path=screenshot_path,
+                    storage_path=storage_dest,
                     mime_type="image/png",
                     file_size_bytes=os.path.getsize(screenshot_path) if os.path.exists(screenshot_path) else 1024
                 )

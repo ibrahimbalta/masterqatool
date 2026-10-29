@@ -19,3 +19,4 @@ greenlet>=3.0.3
 email-validator>=2.1.0
 beautifulsoup4>=4.12.3
 playwright>=1.42.0
+boto3>=1.34.0

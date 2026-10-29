@@ -22,12 +22,39 @@ class Settings(BaseSettings):
     # Redis
     REDIS_URL: str = "redis://localhost:6379/0"
 
-    # S3 Object Storage
-    S3_ENDPOINT_URL: Optional[str] = "http://localhost:9000"
-    S3_ACCESS_KEY_ID: str = "minioadmin"
-    S3_SECRET_ACCESS_KEY: str = "minioadmin"
+    # S3 / Cloudflare R2 Object Storage
+    S3_ENDPOINT_URL: Optional[str] = None
+    S3_ACCESS_KEY_ID: Optional[str] = None
+    S3_SECRET_ACCESS_KEY: Optional[str] = None
     S3_BUCKET_NAME: str = "qa-artifacts"
-    S3_REGION: str = "us-east-1"
+    S3_REGION: str = "auto"
+    S3_PUBLIC_URL_PREFIX: Optional[str] = None
+
+    # Cloudflare R2 Convenient Aliases
+    R2_ACCOUNT_ID: Optional[str] = None
+    R2_ACCESS_KEY_ID: Optional[str] = None
+    R2_SECRET_ACCESS_KEY: Optional[str] = None
+    R2_BUCKET_NAME: Optional[str] = None
+
+    @property
+    def r2_endpoint_url(self) -> Optional[str]:
+        if self.S3_ENDPOINT_URL:
+            return self.S3_ENDPOINT_URL
+        if self.R2_ACCOUNT_ID:
+            return f"https://{self.R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+        return None
+
+    @property
+    def r2_access_key(self) -> Optional[str]:
+        return self.S3_ACCESS_KEY_ID or self.R2_ACCESS_KEY_ID
+
+    @property
+    def r2_secret_key(self) -> Optional[str]:
+        return self.S3_SECRET_ACCESS_KEY or self.R2_SECRET_ACCESS_KEY
+
+    @property
+    def r2_bucket(self) -> str:
+        return self.R2_BUCKET_NAME or self.S3_BUCKET_NAME or "qa-artifacts"
 
     # AI Configuration
     AI_PROVIDER: str = "mock"
