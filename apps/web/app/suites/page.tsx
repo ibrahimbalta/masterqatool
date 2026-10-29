@@ -26,7 +26,14 @@ export default function TestSuitesPage() {
     api.getProjects().then((projs) => {
       setProjects(projs);
       if (projs.length > 0) {
-        setSelectedProjectId(projs[0].id);
+        const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const targetProjId = urlParams?.get('projectId');
+        if (targetProjId && projs.some((p) => p.id === targetProjId)) {
+          setSelectedProjectId(targetProjId);
+        } else {
+          const seramikProj = projs.find((p) => p.name.toLowerCase().includes('seramik') || p.target_url.includes('seramikbak'));
+          setSelectedProjectId(seramikProj ? seramikProj.id : projs[0].id);
+        }
       }
     });
   }, []);

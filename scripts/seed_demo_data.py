@@ -534,7 +534,7 @@ async def seed():
                 organization_id=org.id,
                 trigger="manual",
                 status="completed",
-                passed_cases=3,
+                passed_cases=26,
                 failed_cases=0,
                 started_at=datetime.now(timezone.utc),
                 completed_at=datetime.now(timezone.utc),
@@ -626,75 +626,61 @@ async def seed():
             )
             session.add_all([sp1, sp2])
 
-            tc_s1 = TestCase(
-                project_id=seramik.id,
-                code_identifier="TC-SERAMIK-001",
-                title="SeramikBak ana sayfasının ve 3D vitrin başlığının yüklenmesini doğrula",
-                objective="https://www.seramikbak.com/ adresine HTTP 200 ile erişilebildiğini ve başlığın render edildiğini doğrula.",
-                category="smoke",
-                priority="critical",
-                risk_level="low",
-                automation_status="automated",
-                approval_status="approved",
-                current_version=1,
-                ai_confidence_score=0.98,
-                provenance="observed",
-                latest_spec={
-                    "preconditions": ["İnternet bağlantısı ve Vercel CDN aktif olmalı"],
-                    "steps": [
-                        {"step_number": 1, "action_type": "goto", "target_locator": "https://www.seramikbak.com/", "expected_result": "HTTP 200 ile ana sayfa açılır"},
-                        {"step_number": 2, "action_type": "assert_visible", "target_locator": "body", "expected_result": "Ana içerik yüklenir"},
-                        {"step_number": 3, "action_type": "assert_visible", "target_locator": "h1, header, nav", "expected_result": "Başlık veya navigasyon barı görüntülenir"}
-                    ],
-                    "expected_result": "SeramikBak ana sayfası başarıyla açılır"
-                }
-            )
-            tc_s2 = TestCase(
-                project_id=seramik.id,
-                code_identifier="TC-SERAMIK-002",
-                title="Seramik arama kutusuna ürün sorgusu yazılabilmesini doğrula",
-                objective="Kullanıcının seramik veya fayans modeli aratabilmesi için arama kutusunun etkileşime açık olduğunu doğrula.",
-                category="functional",
-                priority="high",
-                risk_level="medium",
-                automation_status="automated",
-                approval_status="approved",
-                current_version=1,
-                ai_confidence_score=0.95,
-                provenance="ai_inferred",
-                latest_spec={
-                    "preconditions": ["Ana sayfa arama kutusu görünür olmalı"],
-                    "steps": [
-                        {"step_number": 1, "action_type": "goto", "target_locator": "https://www.seramikbak.com/", "expected_result": "Sayfa yüklenir"},
-                        {"step_number": 2, "action_type": "fill", "target_locator": "input[type='text'], input[placeholder*='ara' i]", "input_value": "Mermer Görünümlü 60x120", "expected_result": "Arama terimi girilir"},
-                        {"step_number": 3, "action_type": "assert_visible", "target_locator": "input[type='text'], input[placeholder*='ara' i]", "expected_result": "Yazılan metin input alanında kalır"}
-                    ],
-                    "expected_result": "Arama sorgusu başarıyla işlenir"
-                }
-            )
-            tc_s3 = TestCase(
-                project_id=seramik.id,
-                code_identifier="TC-SERAMIK-003",
-                title="Bayi ağı ve seramik bağlantı linklerinin erişilebilirliğini doğrula",
-                objective="Sayfadaki bayi ağı bağlantısının ve harici linklerin kırık olmadığını doğrula.",
-                category="functional",
-                priority="medium",
-                risk_level="low",
-                automation_status="automated",
-                approval_status="approved",
-                current_version=1,
-                ai_confidence_score=0.92,
-                provenance="ai_inferred",
-                latest_spec={
-                    "preconditions": ["Navigasyon linkleri mevcut olmalı"],
-                    "steps": [
-                        {"step_number": 1, "action_type": "goto", "target_locator": "https://www.seramikbak.com/", "expected_result": "Sayfa açılır"},
-                        {"step_number": 2, "action_type": "assert_visible", "target_locator": "a[href*='bayi'], a[href*='katalog'], nav a", "expected_result": "Navigasyon linkleri DOM üzerinde mevcuttur"}
-                    ],
-                    "expected_result": "Menü linkleri sorunsuz çalışır"
-                }
-            )
-            session.add_all([tc_s1, tc_s2, tc_s3])
+            SERAMIK_CASES_SPEC = [
+                ("TC-SERAMIK-001", "Ana sayfa hero alanı, arama motoru çubuğu ve vitrin başlıklarını doğrula", "smoke", "critical", "https://www.seramikbak.com/"),
+                ("TC-SERAMIK-002", "Katalog modülü (/katalog) ürün ızgarası ve listeleme kontrolü", "functional", "high", "https://www.seramikbak.com/katalog"),
+                ("TC-SERAMIK-003", "Kategori filtreleme (/kategori) mekanizmasını doğrula", "functional", "high", "https://www.seramikbak.com/kategori"),
+                ("TC-SERAMIK-004", "Üretici marka rehberi (/marka) sayfalarının erişilebilirliği", "functional", "medium", "https://www.seramikbak.com/marka"),
+                ("TC-SERAMIK-005", "Ürün detay sayfası (/urun) teknik özellikler ve ebat kontrolü", "functional", "high", "https://www.seramikbak.com/urun"),
+                ("TC-SERAMIK-006", "Outlet ve fırsat seramikleri (/outlet) vitrin kontrolü", "functional", "medium", "https://www.seramikbak.com/outlet"),
+                ("TC-SERAMIK-007", "3D Mekân Simülasyonu (/mekan-dene) motorunun yüklenmesi", "functional", "critical", "https://www.seramikbak.com/mekan-dene"),
+                ("TC-SERAMIK-008", "Mekânımda Gör (/mekanimda-gor) AR kamera & fotoğraf yükleme alanı", "functional", "high", "https://www.seramikbak.com/mekanimda-gor"),
+                ("TC-SERAMIK-009", "Kombinasyon ve Tasarım Aracı (/tasarim) bileşen kontrolü", "functional", "medium", "https://www.seramikbak.com/tasarim"),
+                ("TC-SERAMIK-010", "Fiyat Teklifi Formu (/teklif-al) boş form validasyon kontrolü", "negative", "high", "https://www.seramikbak.com/teklif-al"),
+                ("TC-SERAMIK-011", "Toplu Proje Talebi (/proje-talep) mimari ve müteahhit form kontrolü", "functional", "high", "https://www.seramikbak.com/proje-talep"),
+                ("TC-SERAMIK-012", "İletişim Formu (/iletisim) ve şirket adres/harita doğrulaması", "smoke", "medium", "https://www.seramikbak.com/iletisim"),
+                ("TC-SERAMIK-013", "Yetkili Bayi Rehberi (/bayiler) şehir ve ilçe filtre kontrolü", "functional", "high", "https://www.seramikbak.com/bayiler"),
+                ("TC-SERAMIK-014", "Bayi kartlarında telefon ve WhatsApp yönlendirme butonları kontrolü", "functional", "medium", "https://www.seramikbak.com/bayiler"),
+                ("TC-SERAMIK-015", "Usta Rehberi (/ustalar) onaylı seramik döşeme ustaları listesi", "functional", "high", "https://www.seramikbak.com/ustalar"),
+                ("TC-SERAMIK-016", "Mimar Portalı (/mimar) CAD/BIM doküman ve numune talep akışı", "functional", "medium", "https://www.seramikbak.com/mimar"),
+                ("TC-SERAMIK-017", "Mağaza Dokunmatik Kiosk Modu (/kiosk) tam ekran arayüz kontrolü", "smoke", "medium", "https://www.seramikbak.com/kiosk"),
+                ("TC-SERAMIK-018", "Yapay Zeka Asistanı (/yapay-zeka) görsel seramik arama arayüzü", "functional", "high", "https://www.seramikbak.com/yapay-zeka"),
+                ("TC-SERAMIK-019", "Trendler ve Keşif (/kesfet) küratörlü koleksiyon kontrolü", "smoke", "low", "https://www.seramikbak.com/kesfet"),
+                ("TC-SERAMIK-020", "İlham Galerisi (/ilham) mimari uygulama fotoğrafları kontrolü", "smoke", "low", "https://www.seramikbak.com/ilham"),
+                ("TC-SERAMIK-021", "Kullanıcı Girişi (/uyelik) geçersiz parola ile hata bildirimi", "negative", "high", "https://www.seramikbak.com/uyelik"),
+                ("TC-SERAMIK-022", "Bayi B2B Portalı Giriş Koruması (/bayi)", "functional", "high", "https://www.seramikbak.com/bayi"),
+                ("TC-SERAMIK-023", "Sistem Yönetim Konsolu (/admin) koruma katmanı kontrolü", "functional", "critical", "https://www.seramikbak.com/admin"),
+                ("TC-SERAMIK-024", "Hakkımızda sayfası (/hakkimizda) vizyon ve şirket bilgileri kontrolü", "smoke", "low", "https://www.seramikbak.com/hakkimizda"),
+                ("TC-SERAMIK-025", "KVKK ve Yasal Şartlar (/yasal) aydınlatma metni kontrolü", "smoke", "low", "https://www.seramikbak.com/yasal"),
+                ("TC-SERAMIK-026", "Mobil Görünüm (375x667) mobil menü açılışı ve dokunmatik navigasyon", "functional", "high", "https://www.seramikbak.com/")
+            ]
+
+            all_seramik_cases = []
+            for code, title, cat, prio, target in SERAMIK_CASES_SPEC:
+                tc_obj = TestCase(
+                    project_id=seramik.id,
+                    code_identifier=code,
+                    title=title,
+                    objective=f"{title} - E2E otomatik kalite güvence testi.",
+                    category=cat,
+                    priority=prio,
+                    risk_level="medium",
+                    automation_status="automated",
+                    approval_status="approved",
+                    current_version=1,
+                    ai_confidence_score=0.96,
+                    provenance="observed",
+                    latest_spec={
+                        "preconditions": ["Aktif internet bağlantısı", "Vercel barındırma sunucusu aktif"],
+                        "steps": [
+                            {"step_number": 1, "action_type": "goto", "target_locator": target, "expected_result": "Hedef sayfa açılır"},
+                            {"step_number": 2, "action_type": "assert_visible", "target_locator": "body", "expected_result": "Sayfa DOM öğeleri render edilir"}
+                        ],
+                        "expected_result": "Test senaryosu başarıyla tamamlanır"
+                    }
+                )
+                all_seramik_cases.append(tc_obj)
+            session.add_all(all_seramik_cases)
             await session.flush()
 
             s_suite = TestSuite(
@@ -703,7 +689,7 @@ async def seed():
                 description="SeramikBak platformunun vitrin, arama motoru ve bayi ağı akışlarını denetleyen tam otomasyon paketi.",
                 category="smoke"
             )
-            s_suite.test_cases.extend([tc_s1, tc_s2, tc_s3])
+            s_suite.test_cases.extend(all_seramik_cases)
             session.add(s_suite)
 
             s_run = TestRun(
@@ -711,7 +697,7 @@ async def seed():
                 organization_id=org.id,
                 trigger="manual",
                 status="completed",
-                passed_cases=3,
+                passed_cases=26,
                 failed_cases=0,
                 started_at=datetime.now(timezone.utc),
                 completed_at=datetime.now(timezone.utc),
@@ -720,7 +706,7 @@ async def seed():
             session.add(s_run)
             await session.flush()
 
-            for idx, tc_s_item in enumerate([tc_s1, tc_s2, tc_s3], 1):
+            for idx, tc_s_item in enumerate(all_seramik_cases, 1):
                 res_s_item = TestResult(
                     test_run_id=s_run.id,
                     test_case_id=tc_s_item.id,
