@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { PlaySquare, RefreshCw, XCircle, Clock, AlertCircle, Camera, Terminal, ShieldAlert, Loader2 } from 'lucide-react';
-import { api, TestRun, Project } from '@/lib/api';
+import { PlaySquare, RefreshCw, XCircle, Clock, AlertCircle, Camera, Terminal, ShieldAlert, Loader2, Wrench, Sparkles, CheckCircle2 } from 'lucide-react';
+import { api, TestRun, Project, LocatorRepair } from '@/lib/api';
 import { StatusBadge } from '@/components/StatusBadge';
 
 export default function ExecutionCenterPage() {
@@ -11,6 +11,21 @@ export default function ExecutionCenterPage() {
   const [runs, setRuns] = useState<TestRun[]>([]);
   const [activeRun, setActiveRun] = useState<TestRun | null>(null);
   const [loading, setLoading] = useState(true);
+  const [applyingRepairId, setApplyingRepairId] = useState<string | null>(null);
+
+  const handleApplyRepair = async (repairId: string) => {
+    setApplyingRepairId(repairId);
+    try {
+      await api.updateLocatorRepair(repairId, 'applied');
+      if (selectedProjectId) {
+        await loadRuns(selectedProjectId);
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to apply locator repair');
+    } finally {
+      setApplyingRepairId(null);
+    }
+  };
 
   useEffect(() => {
     api.getProjects().then((projs) => {
@@ -249,6 +264,65 @@ export default function ExecutionCenterPage() {
                                 </div>
                               </div>
                             ))}
+                          </div>
+                        )}
+
+                        {/* Self-Healing Recommendations */}
+                        {res.locator_repairs && res.locator_repairs.length > 0 && (
+                          <div className="p-3 rounded-lg bg-brand-orange/5 border border-brand-orange/20 space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-semibold text-brand-orange flex items-center gap-1.5 font-mono">
+                                <Sparkles className="w-3.5 h-3.5" />
+                                Self-Healing Locator Recommendations
+                              </span>
+                              <span className="text-[10px] font-mono text-zinc-400 uppercase">
+                                {res.locator_repairs.length} candidate(s)
+                              </span>
+                            </div>
+
+                            <div className="space-y-2">
+                              {res.locator_repairs.map((repair) => (
+                                <div
+                                  key={repair.id}
+                                  className="p-2.5 rounded bg-surface-200 border border-border flex flex-col md:flex-row md:items-center justify-between gap-2 text-xs font-mono"
+                                >
+                                  <div className="space-y-0.5">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-300 text-brand-orange font-bold">
+                                        {repair.strategy}
+                                      </span>
+                                      <span className="text-zinc-400 text-[11px]">
+                                        Confidence: {Math.round(repair.confidence_score * 100)}%
+                                      </span>
+                                    </div>
+                                    <p className="text-white font-medium">{repair.suggested_locator}</p>
+                                    <p className="text-zinc-500 text-[10px]">Replaces: {repair.original_locator}</p>
+                                  </div>
+
+                                  <div>
+                                    {repair.status === 'applied' ? (
+                                      <span className="flex items-center gap-1 text-[11px] text-status-passed font-semibold bg-status-passed/10 px-2 py-1 rounded border border-status-passed/20">
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        Applied
+                                      </span>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleApplyRepair(repair.id)}
+                                        disabled={applyingRepairId === repair.id}
+                                        className="flex items-center gap-1 px-3 py-1 rounded bg-brand-orange hover:bg-brand-orangeHover text-white text-[11px] font-semibold shadow transition-all"
+                                      >
+                                        {applyingRepairId === repair.id ? (
+                                          <Loader2 className="w-3 h-3 animate-spin" />
+                                        ) : (
+                                          <Wrench className="w-3 h-3" />
+                                        )}
+                                        Apply Fix
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
 
