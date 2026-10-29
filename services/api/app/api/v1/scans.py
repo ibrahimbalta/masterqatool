@@ -49,21 +49,19 @@ async def start_scan(
     )
     db.add(scan)
     await db.commit()
-    await db.refresh(scan)
 
     if sync:
         service = WebDiscoveryService(db)
         await service.run_discovery(scan.id)
-        stmt = (
-            select(ProjectScan)
-            .options(selectinload(ProjectScan.discovered_pages))
-            .where(ProjectScan.id == scan.id)
-        )
-        return (await db.execute(stmt)).scalar_one()
     else:
         background_tasks.add_task(run_discovery_task, scan.id)
 
-    return scan
+    stmt = (
+        select(ProjectScan)
+        .options(selectinload(ProjectScan.discovered_pages))
+        .where(ProjectScan.id == scan.id)
+    )
+    return (await db.execute(stmt)).scalar_one()
 
 @router.get("", response_model=List[ScanRead])
 async def list_scans(

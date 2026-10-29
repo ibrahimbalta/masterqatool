@@ -559,10 +559,188 @@ async def seed():
                 session.add_all([s1, s2, s3])
 
             await session.commit()
-            print("Demo data seeded successfully!")
-            print(f"Project ID: {project.id}")
-            print(f"User: architect@acme-qa.com / SecurePass123!")
-            print("Now launch the web app with 'npm run dev' to explore!")
+
+        # 10. Create Project: SeramikBak
+        seramik_res = await session.execute(
+            select(Project).where(Project.organization_id == org.id, Project.target_url.ilike("%seramikbak%"))
+        )
+        seramik = seramik_res.scalar_one_or_none()
+        if not seramik:
+            print("Creating Project: SeramikBak ...")
+            seramik = Project(
+                organization_id=org.id,
+                name="SeramikBak",
+                description="Türkiye'nin Seramik Arama Motoru, 3D Mekân ve Bayi Ağı Web Platformu",
+                target_url="https://www.seramikbak.com/",
+                github_repo="https://github.com/ibrahimbalta/seramikbak",
+                environment="production",
+                status="active"
+            )
+            session.add(seramik)
+            await session.flush()
+
+        seramik_tc_check = await session.execute(
+            select(TestCase).where(TestCase.project_id == seramik.id)
+        )
+        if not seramik_tc_check.scalars().first():
+            print("Seeding SeramikBak Scans, Test Cases and Suites ...")
+            seramik_scan = ProjectScan(
+                project_id=seramik.id,
+                scan_type="url_crawler",
+                status="completed",
+                started_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(timezone.utc),
+                summary={"pages_discovered": 3, "forms_detected": 1}
+            )
+            session.add(seramik_scan)
+            await session.flush()
+
+            sp1 = DiscoveredPage(
+                scan_id=seramik_scan.id,
+                project_id=seramik.id,
+                url="https://www.seramikbak.com/",
+                path="/",
+                http_status=200,
+                title="SeramikBak | Türkiye'nin Seramik Arama Motoru, 3D Mekân ve Bayi Ağı",
+                forms_detected=[{
+                    "form_id": "search-form",
+                    "action": "/arama",
+                    "method": "GET",
+                    "fields": [{"name": "q", "type": "text", "required": False, "recommended_locator": "input[type='text'], input[placeholder*='ara' i]"}],
+                    "inputs": [{"name": "q", "type": "text", "required": False, "recommended_locator": "input[type='text'], input[placeholder*='ara' i]"}],
+                    "buttons": [{"text": "Ara", "type": "submit"}]
+                }],
+                accessibility_tree={"role": "main", "name": "SeramikBak Arama ve Keşif"},
+                provenance="observed"
+            )
+            sp2 = DiscoveredPage(
+                scan_id=seramik_scan.id,
+                project_id=seramik.id,
+                url="https://www.seramikbak.com/bayiler",
+                path="/bayiler",
+                http_status=200,
+                title="Türkiye Çapında Yetkili Seramik Bayileri — SeramikBak",
+                forms_detected=[],
+                accessibility_tree={"role": "region", "name": "Bayi Listesi"},
+                provenance="observed"
+            )
+            session.add_all([sp1, sp2])
+
+            tc_s1 = TestCase(
+                project_id=seramik.id,
+                code_identifier="TC-SERAMIK-001",
+                title="SeramikBak ana sayfasının ve 3D vitrin başlığının yüklenmesini doğrula",
+                objective="https://www.seramikbak.com/ adresine HTTP 200 ile erişilebildiğini ve başlığın render edildiğini doğrula.",
+                category="smoke",
+                priority="critical",
+                risk_level="low",
+                automation_status="automated",
+                approval_status="approved",
+                current_version=1,
+                ai_confidence_score=0.98,
+                provenance="observed",
+                latest_spec={
+                    "preconditions": ["İnternet bağlantısı ve Vercel CDN aktif olmalı"],
+                    "steps": [
+                        {"step_number": 1, "action_type": "goto", "target_locator": "https://www.seramikbak.com/", "expected_result": "HTTP 200 ile ana sayfa açılır"},
+                        {"step_number": 2, "action_type": "assert_visible", "target_locator": "body", "expected_result": "Ana içerik yüklenir"},
+                        {"step_number": 3, "action_type": "assert_visible", "target_locator": "h1, header, nav", "expected_result": "Başlık veya navigasyon barı görüntülenir"}
+                    ],
+                    "expected_result": "SeramikBak ana sayfası başarıyla açılır"
+                }
+            )
+            tc_s2 = TestCase(
+                project_id=seramik.id,
+                code_identifier="TC-SERAMIK-002",
+                title="Seramik arama kutusuna ürün sorgusu yazılabilmesini doğrula",
+                objective="Kullanıcının seramik veya fayans modeli aratabilmesi için arama kutusunun etkileşime açık olduğunu doğrula.",
+                category="functional",
+                priority="high",
+                risk_level="medium",
+                automation_status="automated",
+                approval_status="approved",
+                current_version=1,
+                ai_confidence_score=0.95,
+                provenance="ai_inferred",
+                latest_spec={
+                    "preconditions": ["Ana sayfa arama kutusu görünür olmalı"],
+                    "steps": [
+                        {"step_number": 1, "action_type": "goto", "target_locator": "https://www.seramikbak.com/", "expected_result": "Sayfa yüklenir"},
+                        {"step_number": 2, "action_type": "fill", "target_locator": "input[type='text'], input[placeholder*='ara' i]", "input_value": "Mermer Görünümlü 60x120", "expected_result": "Arama terimi girilir"},
+                        {"step_number": 3, "action_type": "assert_visible", "target_locator": "input[type='text'], input[placeholder*='ara' i]", "expected_result": "Yazılan metin input alanında kalır"}
+                    ],
+                    "expected_result": "Arama sorgusu başarıyla işlenir"
+                }
+            )
+            tc_s3 = TestCase(
+                project_id=seramik.id,
+                code_identifier="TC-SERAMIK-003",
+                title="Bayi ağı ve seramik bağlantı linklerinin erişilebilirliğini doğrula",
+                objective="Sayfadaki bayi ağı bağlantısının ve harici linklerin kırık olmadığını doğrula.",
+                category="functional",
+                priority="medium",
+                risk_level="low",
+                automation_status="automated",
+                approval_status="approved",
+                current_version=1,
+                ai_confidence_score=0.92,
+                provenance="ai_inferred",
+                latest_spec={
+                    "preconditions": ["Navigasyon linkleri mevcut olmalı"],
+                    "steps": [
+                        {"step_number": 1, "action_type": "goto", "target_locator": "https://www.seramikbak.com/", "expected_result": "Sayfa açılır"},
+                        {"step_number": 2, "action_type": "assert_visible", "target_locator": "a[href*='bayi'], a[href*='katalog'], nav a", "expected_result": "Navigasyon linkleri DOM üzerinde mevcuttur"}
+                    ],
+                    "expected_result": "Menü linkleri sorunsuz çalışır"
+                }
+            )
+            session.add_all([tc_s1, tc_s2, tc_s3])
+            await session.flush()
+
+            s_suite = TestSuite(
+                project_id=seramik.id,
+                name="SeramikBak E2E Regresyon Paketi",
+                description="SeramikBak platformunun vitrin, arama motoru ve bayi ağı akışlarını denetleyen tam otomasyon paketi.",
+                category="smoke"
+            )
+            s_suite.test_cases.extend([tc_s1, tc_s2, tc_s3])
+            session.add(s_suite)
+
+            s_run = TestRun(
+                project_id=seramik.id,
+                organization_id=org.id,
+                trigger="manual",
+                status="completed",
+                passed_cases=3,
+                failed_cases=0,
+                started_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(timezone.utc),
+                duration_ms=25418
+            )
+            session.add(s_run)
+            await session.flush()
+
+            for idx, tc_s_item in enumerate([tc_s1, tc_s2, tc_s3], 1):
+                res_s_item = TestResult(
+                    test_run_id=s_run.id,
+                    test_case_id=tc_s_item.id,
+                    status="passed",
+                    duration_ms=4000 + (idx * 500)
+                )
+                session.add(res_s_item)
+                await session.flush()
+
+                st1 = TestStep(test_result_id=res_s_item.id, step_number=1, action_type="goto", target_locator="https://www.seramikbak.com/", status="passed", duration_ms=2500)
+                st2 = TestStep(test_result_id=res_s_item.id, step_number=2, action_type="assert_visible", target_locator="body", status="passed", duration_ms=800)
+                session.add_all([st1, st2])
+
+            await session.commit()
+            print("SeramikBak demo data seeded successfully!")
+
+        print("All projects seeded successfully!")
+        print(f"Project ID: {project.id}")
+        print(f"User: architect@acme-qa.com / SecurePass123!")
+        print("Now launch the web app with 'npm run dev' to explore!")
 
 if __name__ == "__main__":
     asyncio.run(seed())
