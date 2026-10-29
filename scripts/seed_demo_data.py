@@ -144,11 +144,16 @@ async def seed():
                 title="Customer Sign In",
                 forms_detected=[
                     {
+                        "form_id": "login-form",
                         "action": "/api/v1/auth/login",
                         "method": "POST",
+                        "fields": [
+                            {"name": "email", "type": "email", "required": True, "recommended_locator": "input[name='email']"},
+                            {"name": "password", "type": "password", "required": True, "recommended_locator": "input[name='password']"}
+                        ],
                         "inputs": [
-                            {"name": "email", "type": "email", "required": True},
-                            {"name": "password", "type": "password", "required": True}
+                            {"name": "email", "type": "email", "required": True, "recommended_locator": "input[name='email']"},
+                            {"name": "password", "type": "password", "required": True, "recommended_locator": "input[name='password']"}
                         ],
                         "buttons": [{"text": "Sign In", "type": "submit"}]
                     }

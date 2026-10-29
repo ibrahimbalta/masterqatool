@@ -224,13 +224,13 @@ export default function ExecutionCenterPage() {
                   Test Case Results & Evidence
                 </h3>
 
-                {activeRun.results.length === 0 ? (
+                {(!activeRun.results || activeRun.results.length === 0) ? (
                   <div className="p-6 text-center text-xs text-zinc-500 border border-dashed border-border rounded-lg">
                     Awaiting worker to start executing queued test cases...
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {activeRun.results.map((res) => (
+                    {(activeRun.results || []).map((res) => (
                       <div key={res.id} className="p-4 rounded-lg bg-surface-300 border border-border space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-mono font-bold text-white">
@@ -246,10 +246,10 @@ export default function ExecutionCenterPage() {
                         )}
 
                         {/* Step breakdown */}
-                        {res.steps.length > 0 && (
+                        {res.steps && res.steps.length > 0 && (
                           <div className="space-y-1.5 pt-2 border-t border-border">
                             <span className="text-[11px] font-semibold text-zinc-400 block">Execution Steps:</span>
-                            {res.steps.map((step) => (
+                            {(res.steps || []).map((step) => (
                               <div
                                 key={step.id}
                                 className="flex items-center justify-between text-xs font-mono py-1 px-2 rounded bg-surface-200"

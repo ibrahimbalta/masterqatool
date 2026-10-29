@@ -264,37 +264,42 @@ export default function ProjectIntelligencePage() {
                   </div>
 
                   {/* Forms Breakdown */}
-                  {p.forms_detected.length > 0 && (
+                  {Array.isArray(p.forms_detected) && p.forms_detected.length > 0 && (
                     <div className="p-4 rounded-lg bg-surface-300 border border-border space-y-3">
                       <span className="text-xs font-semibold text-zinc-300 block">
                         Detected Forms ({p.forms_detected.length})
                       </span>
-                      {p.forms_detected.map((form, fIdx) => (
-                        <div key={fIdx} className="space-y-2 text-xs font-mono">
-                          <div className="flex items-center gap-2 text-zinc-400">
-                            <span className="text-brand-orange uppercase">{form.method}</span>
-                            <span>{form.action || 'Default Action'}</span>
-                            <span className="text-zinc-600">ID: {form.form_id}</span>
-                          </div>
+                      {p.forms_detected.map((form: any, fIdx: number) => {
+                        const formFields: any[] = form.fields || form.inputs || [];
+                        return (
+                          <div key={fIdx} className="space-y-2 text-xs font-mono">
+                            <div className="flex items-center gap-2 text-zinc-400">
+                              <span className="text-brand-orange uppercase">{form.method || 'POST'}</span>
+                              <span>{form.action || 'Default Action'}</span>
+                              <span className="text-zinc-600">ID: {form.form_id || `form_${fIdx}`}</span>
+                            </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
-                            {form.fields.map((f, fieldIdx) => (
-                              <div
-                                key={fieldIdx}
-                                className="p-2 rounded bg-surface-200 border border-border flex items-center justify-between text-[11px]"
-                              >
-                                <div>
-                                  <span className="text-white font-semibold">{f.name || 'unnamed'}</span>
-                                  <span className="text-zinc-500 ml-1.5">({f.type})</span>
-                                </div>
-                                <span className="text-brand-orange text-[10px] truncate max-w-[140px]">
-                                  {f.recommended_locator || 'CSS locator'}
-                                </span>
+                            {formFields.length > 0 && (
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1">
+                                {formFields.map((f: any, fieldIdx: number) => (
+                                  <div
+                                    key={fieldIdx}
+                                    className="p-2 rounded bg-surface-200 border border-border flex items-center justify-between text-[11px]"
+                                  >
+                                    <div>
+                                      <span className="text-white font-semibold">{f.name || 'unnamed'}</span>
+                                      <span className="text-zinc-500 ml-1.5">({f.type || 'text'})</span>
+                                    </div>
+                                    <span className="text-brand-orange text-[10px] truncate max-w-[140px]">
+                                      {f.recommended_locator || `[name="${f.name || ''}"]`}
+                                    </span>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
