@@ -3,7 +3,7 @@ import copy
 from typing import List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,7 +13,7 @@ from services.api.app.models.project import Project
 from services.api.app.models.test_suite import TestCase, TestCaseVersion
 from services.api.app.models.test_run import TestRun, TestResult, TestStep, LocatorRepair
 from services.api.app.models.user import OrganizationMember
-from services.api.app.models.subscription import AuditLog
+from services.api.app.models.subscription import AuditLog, Subscription, UsageRecord
 from services.api.app.schemas.test_run import TestRunCreate, TestRunRead, LocatorRepairRead, LocatorRepairUpdate
 from services.api.app.security.deps import get_current_organization_membership, require_role
 from services.worker.app.browser.runner import PlaywrightRunner
@@ -43,6 +43,30 @@ async def trigger_test_run(
     project = proj_res.scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    # Check monthly test minutes quota
+    sub_res = await db.execute(
+        select(Subscription).where(
+            Subscription.organization_id == membership.organization_id,
+            Subscription.status == "active"
+        )
+    )
+    sub = sub_res.scalars().first()
+    test_minutes_limit = sub.max_test_minutes_monthly if sub else 60
+
+    min_res = await db.execute(
+        select(func.sum(UsageRecord.quantity)).where(
+            UsageRecord.organization_id == membership.organization_id,
+            UsageRecord.metric_type == "test_minutes"
+        )
+    )
+    test_minutes_used = float(min_res.scalar() or 0.0)
+
+    if test_minutes_used >= test_minutes_limit:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=f"Monthly test minutes quota reached ({test_minutes_used:.1f}/{test_minutes_limit} min). Please upgrade plan tier."
+        )
 
     # Determine test cases to run
     if run_in.test_case_ids:

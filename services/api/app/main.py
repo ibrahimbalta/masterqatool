@@ -1,4 +1,6 @@
 import logging
+import time
+import uuid
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -52,6 +54,23 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def request_context_middleware(request: Request, call_next):
+    req_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    request.state.request_id = req_id
+    start_time = time.time()
+
+    response = await call_next(request)
+
+    process_time = (time.time() - start_time) * 1000
+    response.headers["X-Request-ID"] = req_id
+    response.headers["X-Response-Time-Ms"] = f"{process_time:.2f}"
+
+    if request.url.path not in ["/health", "/docs", "/openapi.json"]:
+        logger.info(f"[{req_id[:8]}] {request.method} {request.url.path} -> {response.status_code} ({process_time:.1f}ms)")
+
+    return response
 
 # API Routers under /api/v1
 app.include_router(health_router, prefix="/api/v1")
