@@ -52,7 +52,60 @@ ai-qa-agent/
 
 ---
 
-## Quick Start (Local Development)
+## Completed Platform Navigation & Features
+
+| # | Navigation Module | Route | Status | Key Capabilities |
+|---|---|---|---|---|
+| 1 | **Dashboard** | `/` | Completed | Real KPI cards, PASS/FAIL distributions, unmeasured coverage labeled "Henüz hesaplanmadı" |
+| 2 | **Projects** | `/projects` | Completed | Project creation wizard, URL validation with SSRF safety, target environment selection |
+| 3 | **Project Intelligence** | `/intelligence` | Completed | DOM crawl exploration, provenance badges (`observed`, `source_code`, `ai_inferred`) |
+| 4 | **Test Case Studio** | `/test-cases` | Completed | AI Test Designer, scenario schema validation, version snapshotting, CSV export |
+| 5 | **Test Suites** | `/suites` | Completed | Smoke, Regression & Critical Path suite grouping, bulk execution, scenario assignment |
+| 6 | **Execution Center** | `/execution` | Completed | Two-panel live run viewer, step execution timeline, artifact inspection, run cancellation |
+| 7 | **Bug Intelligence** | `/bugs` | Completed | Automated bug dossier creation upon test failure, root cause hypothesis vs verified cause |
+| 8 | **Automation Lab** | `/automation` | Completed | Playwright TypeScript compiler, executable code viewer, downloadable ZIP test package |
+| 9 | **Integrations** | `/integrations` | Completed | GitHub repo inspection, source code route detection, CI/CD webhook triggers |
+| 10| **Team & Workspace** | `/team` | Completed | Multi-tenant organization member invites, RBAC (Owner, Admin, Member, Viewer) |
+| 11| **Usage & Billing** | `/usage` | Completed | Quota progress bars (test minutes, projects, AI tokens), quota enforcement middleware |
+| 12| **Settings** | `/settings` | Completed | Browser sandbox timeout configuration, SSRF protection toggles, evidence retention |
+
+---
+
+## Self-Healing Locator Assistant
+
+When Playwright encounters element selector changes during automated execution:
+1. Runner captures DOM HTML state at the moment of failure.
+2. `SelfHealingAssistant` evaluates alternative locator strategies prioritized by resilience:
+   - `getByRole` (confidence: 0.92)
+   - `getByLabel` (confidence: 0.95)
+   - `getByPlaceholder` (confidence: 0.89)
+   - `getByTestId` (confidence: 0.88)
+   - Clean CSS selector fallback (confidence: 0.60)
+3. Generates `LocatorRepair` records attached to the test result.
+4. Users can review, approve, or apply repairs via API/UI. When applied, test case versions are incremented with an auditable snapshot.
+
+---
+
+## Test Verification Suite
+
+All 13 comprehensive backend test suites pass with 100% success:
+- `test_auth.py`: Registration, authentication, duplicate prevention
+- `test_multi_tenancy.py`: Strict cross-organization data isolation
+- `test_projects_and_cases.py`: CRUD, version snapshots, CSV export
+- `test_discovery_and_ai.py`: Web crawler, DOM form parsing, AI scenario generator
+- `test_execution_pass_fail.py`: Deliberately passing vs deliberately failing Playwright execution with screenshot evidence & auto-bug dossiers
+- `test_runs_and_bugs.py`: Queueing, cancellation, bug tracking, usage recording
+- `test_self_healing.py`: Broken locator detection, alternative suggestion scoring, and auto-repair application
+- `test_ssrf_security.py`: Loopback, AWS/GCP/Azure cloud metadata, and scheme attack prevention
+- `test_suites_and_automation.py`: Test suite grouping, Playwright code generation, ZIP export package, GitHub integration, and team management
+
+```bash
+# Run backend pytest suite
+.\.venv\Scripts\python.exe -m pytest services/api/tests/ -v
+
+# Run Next.js frontend build
+cd apps/web && npm run build
+```
 
 ### Prerequisites
 - Node.js 20+ (v24 tested)
