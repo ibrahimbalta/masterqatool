@@ -1,4 +1,17 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+export const getApiBase = (): string => {
+  if (typeof window !== 'undefined') {
+    // When running in browser (Codespaces, Vercel, localhost):
+    // Use relative path so Next.js rewrites proxy requests directly to backend without CORS or mixed-content issues
+    if (process.env.NEXT_PUBLIC_API_URL && !process.env.NEXT_PUBLIC_API_URL.includes('localhost')) {
+      return process.env.NEXT_PUBLIC_API_URL;
+    }
+    return '/api/v1';
+  }
+  // SSR (inside node.js runtime)
+  return process.env.INTERNAL_API_URL || 'http://127.0.0.1:8000/api/v1';
+};
+
+const API_BASE = getApiBase();
 
 export interface Project {
   id: string;
@@ -178,6 +191,10 @@ class ApiClient {
     return null;
   }
 
+  getBaseUrl(): string {
+    return getApiBase();
+  }
+
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = this.getToken();
     const headers: Record<string, string> = {
@@ -189,7 +206,8 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(`${API_BASE}${endpoint}`, {
+    const base = this.getBaseUrl();
+    const res = await fetch(`${base}${endpoint}`, {
       ...options,
       headers,
     });
@@ -208,7 +226,7 @@ class ApiClient {
 
   // Auth
   async login(formData: FormData) {
-    const res = await fetch(`${API_BASE}/auth/login`, {
+    const res = await fetch(`${this.getBaseUrl()}/auth/login`, {
       method: 'POST',
       body: formData,
     });
@@ -336,7 +354,7 @@ class ApiClient {
   }
 
   getExportPackageUrl(projectId: string): string {
-    return `${API_BASE}/projects/${projectId}/automation/export-package`;
+    return `${this.getBaseUrl()}/projects/${projectId}/automation/export-package`;
   }
 
   // Integrations
@@ -383,7 +401,7 @@ class ApiClient {
 
   // Artifacts & Evidence
   getArtifactFileUrl(artifactId: string): string {
-    return `${API_BASE}/artifacts/${artifactId}/file`;
+    return `${this.getBaseUrl()}/artifacts/${artifactId}/file`;
   }
 
   async getArtifact(artifactId: string): Promise<any> {

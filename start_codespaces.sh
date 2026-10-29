@@ -15,6 +15,7 @@ python scripts/seed_demo_data.py
 
 echo ""
 echo "[3/4] Starting FastAPI Backend on Port 8000 (background)..."
+pkill -f "uvicorn services.api.app.main:app" || true
 nohup python -m uvicorn services.api.app.main:app --host 0.0.0.0 --port 8000 > backend.log 2>&1 &
 echo "Backend started in background (logs in backend.log)."
 

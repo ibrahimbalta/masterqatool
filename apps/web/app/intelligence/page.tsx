@@ -75,7 +75,7 @@ export default function ProjectIntelligencePage() {
   const loadScans = async (projId: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/projects/${projId}/scans`, {
+      const res = await fetch(`${api.getBaseUrl()}/projects/${projId}/scans`, {
         headers: { Authorization: `Bearer ${api.getToken()}` },
       });
       if (res.ok) {
@@ -83,7 +83,7 @@ export default function ProjectIntelligencePage() {
         setScans(data);
         if (data.length > 0) {
           // Fetch full scan details including discovered pages
-          const detailRes = await fetch(`http://localhost:8000/api/v1/projects/${projId}/scans/${data[0].id}`, {
+          const detailRes = await fetch(`${api.getBaseUrl()}/projects/${projId}/scans/${data[0].id}`, {
             headers: { Authorization: `Bearer ${api.getToken()}` },
           });
           if (detailRes.ok) {
@@ -105,7 +105,7 @@ export default function ProjectIntelligencePage() {
     if (!selectedProjectId) return;
     setIsScanning(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/projects/${selectedProjectId}/scans?sync=true`, {
+      const res = await fetch(`${api.getBaseUrl()}/projects/${selectedProjectId}/scans?sync=true`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

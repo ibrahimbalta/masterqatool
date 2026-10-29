@@ -66,7 +66,7 @@ export default function TestCaseStudioPage() {
     if (!selectedProjectId) return;
     setIsGenerating(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/projects/${selectedProjectId}/test-cases/generate`, {
+      const res = await fetch(`${api.getBaseUrl()}/projects/${selectedProjectId}/test-cases/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -23,7 +23,7 @@ export default function TeamWorkspacePage() {
         // Fetch runs or usage to get orgId
         api.getUsage().then(() => {
           // Fallback to fetch orgs directly
-          fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'}/organizations`, {
+          fetch(`${api.getBaseUrl()}/organizations`, {
             headers: { Authorization: `Bearer ${api.getToken()}` },
           })
             .then((r) => r.json())
