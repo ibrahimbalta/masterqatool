@@ -23,6 +23,9 @@ wheels/
 .venv/
 qa_agent.db
 qa_agent.db-journal
+test_qa_agent.db
+test_qa_agent.db*
+artifacts_storage/
 
 # Node
 node_modules/

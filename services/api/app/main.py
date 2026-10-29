@@ -13,8 +13,11 @@ from services.api.app.api.v1.organizations import router as org_router
 from services.api.app.api.v1.projects import router as project_router
 from services.api.app.api.v1.scans import router as scan_router
 from services.api.app.api.v1.test_cases import router as test_case_router
+from services.api.app.api.v1.test_suites import router as test_suite_router
 from services.api.app.api.v1.test_runs import router as test_run_router
 from services.api.app.api.v1.bugs import router as bug_router
+from services.api.app.api.v1.automation import router as automation_router
+from services.api.app.api.v1.integrations import router as integration_router
 from services.api.app.api.v1.usage import router as usage_router
 from services.api.app.api.v1.health import router as health_router
 
@@ -57,8 +60,11 @@ app.include_router(org_router, prefix="/api/v1")
 app.include_router(project_router, prefix="/api/v1")
 app.include_router(scan_router, prefix="/api/v1")
 app.include_router(test_case_router, prefix="/api/v1")
+app.include_router(test_suite_router, prefix="/api/v1")
 app.include_router(test_run_router, prefix="/api/v1")
 app.include_router(bug_router, prefix="/api/v1")
+app.include_router(automation_router, prefix="/api/v1")
+app.include_router(integration_router, prefix="/api/v1")
 app.include_router(usage_router, prefix="/api/v1")
 
 @app.exception_handler(Exception)

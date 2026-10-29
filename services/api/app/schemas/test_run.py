@@ -32,6 +32,24 @@ class TestStepRead(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class LocatorRepairRead(BaseModel):
+    id: uuid.UUID
+    test_result_id: uuid.UUID
+    test_case_id: uuid.UUID
+    step_number: int
+    original_locator: str
+    suggested_locator: str
+    strategy: str
+    confidence_score: float
+    dom_snippet: Optional[str] = None
+    status: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class LocatorRepairUpdate(BaseModel):
+    status: str  # approved, rejected, applied
+
 class TestResultRead(BaseModel):
     id: uuid.UUID
     test_run_id: uuid.UUID
@@ -44,6 +62,7 @@ class TestResultRead(BaseModel):
     stack_trace: Optional[str] = None
     steps: List[TestStepRead] = []
     artifacts: List[ArtifactRead] = []
+    locator_repairs: List[LocatorRepairRead] = []
 
     model_config = ConfigDict(from_attributes=True)
 

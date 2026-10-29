@@ -1,18 +1,20 @@
 import uuid
+import copy
 from typing import List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks, Query
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.api.app.db.session import get_db, AsyncSessionLocal
 from services.api.app.models.project import Project
-from services.api.app.models.test_suite import TestCase
-from services.api.app.models.test_run import TestRun, TestResult, TestStep
+from services.api.app.models.test_suite import TestCase, TestCaseVersion
+from services.api.app.models.test_run import TestRun, TestResult, TestStep, LocatorRepair
 from services.api.app.models.user import OrganizationMember
 from services.api.app.models.subscription import AuditLog
-from services.api.app.schemas.test_run import TestRunCreate, TestRunRead
+from services.api.app.schemas.test_run import TestRunCreate, TestRunRead, LocatorRepairRead, LocatorRepairUpdate
 from services.api.app.security.deps import get_current_organization_membership, require_role
 from services.worker.app.browser.runner import PlaywrightRunner
 
@@ -98,6 +100,7 @@ async def trigger_test_run(
             select(TestRun)
             .options(selectinload(TestRun.results).selectinload(TestResult.steps))
             .options(selectinload(TestRun.results).selectinload(TestResult.artifacts))
+            .options(selectinload(TestRun.results).selectinload(TestResult.locator_repairs))
             .where(TestRun.id == test_run.id)
         )
         return (await db.execute(stmt)).scalar_one()
@@ -109,6 +112,7 @@ async def trigger_test_run(
         select(TestRun)
         .options(selectinload(TestRun.results).selectinload(TestResult.steps))
         .options(selectinload(TestRun.results).selectinload(TestResult.artifacts))
+        .options(selectinload(TestRun.results).selectinload(TestResult.locator_repairs))
         .where(TestRun.id == test_run.id)
     )
     full_run = (await db.execute(stmt)).scalar_one()
@@ -124,6 +128,7 @@ async def get_test_run(
         select(TestRun)
         .options(selectinload(TestRun.results).selectinload(TestResult.steps))
         .options(selectinload(TestRun.results).selectinload(TestResult.artifacts))
+        .options(selectinload(TestRun.results).selectinload(TestResult.locator_repairs))
         .where(
             TestRun.id == run_id,
             TestRun.organization_id == membership.organization_id
@@ -164,6 +169,7 @@ async def cancel_test_run(
         select(TestRun)
         .options(selectinload(TestRun.results).selectinload(TestResult.steps))
         .options(selectinload(TestRun.results).selectinload(TestResult.artifacts))
+        .options(selectinload(TestRun.results).selectinload(TestResult.locator_repairs))
         .where(TestRun.id == test_run.id)
     )
     return (await db.execute(stmt)).scalar_one()
@@ -178,6 +184,7 @@ async def list_project_test_runs(
         select(TestRun)
         .options(selectinload(TestRun.results).selectinload(TestResult.steps))
         .options(selectinload(TestRun.results).selectinload(TestResult.artifacts))
+        .options(selectinload(TestRun.results).selectinload(TestResult.locator_repairs))
         .where(
             TestRun.project_id == project_id,
             TestRun.organization_id == membership.organization_id
@@ -186,3 +193,74 @@ async def list_project_test_runs(
     )
     res = await db.execute(stmt)
     return res.scalars().all()
+
+@router.get("/test-results/{result_id}/locator-repairs", response_model=List[LocatorRepairRead])
+async def list_locator_repairs_for_result(
+    result_id: uuid.UUID,
+    membership: OrganizationMember = Depends(get_current_organization_membership),
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = (
+        select(LocatorRepair)
+        .join(TestResult, TestResult.id == LocatorRepair.test_result_id)
+        .join(TestRun, TestRun.id == TestResult.test_run_id)
+        .where(
+            LocatorRepair.test_result_id == result_id,
+            TestRun.organization_id == membership.organization_id
+        )
+        .order_by(LocatorRepair.confidence_score.desc())
+    )
+    res = await db.execute(stmt)
+    return res.scalars().all()
+
+@router.patch("/locator-repairs/{repair_id}", response_model=LocatorRepairRead)
+async def update_locator_repair(
+    repair_id: uuid.UUID,
+    repair_in: LocatorRepairUpdate,
+    membership: OrganizationMember = Depends(require_role(["owner", "admin", "member"])),
+    db: AsyncSession = Depends(get_db)
+):
+    stmt = (
+        select(LocatorRepair)
+        .join(TestResult, TestResult.id == LocatorRepair.test_result_id)
+        .join(TestRun, TestRun.id == TestResult.test_run_id)
+        .where(
+            LocatorRepair.id == repair_id,
+            TestRun.organization_id == membership.organization_id
+        )
+    )
+    res = await db.execute(stmt)
+    repair = res.scalar_one_or_none()
+    if not repair:
+        raise HTTPException(status_code=404, detail="Locator repair not found")
+
+    repair.status = repair_in.status
+
+    # If status is applied, propagate repair into TestCase latest_spec steps
+    if repair_in.status == "applied":
+        tc_res = await db.execute(select(TestCase).where(TestCase.id == repair.test_case_id))
+        test_case = tc_res.scalar_one_or_none()
+        if test_case and test_case.latest_spec:
+            new_spec = copy.deepcopy(test_case.latest_spec)
+            steps = new_spec.get("steps", [])
+            updated = False
+            for step in steps:
+                if step.get("step_number") == repair.step_number or step.get("target_locator") == repair.original_locator:
+                    step["target_locator"] = repair.suggested_locator
+                    updated = True
+            if updated:
+                test_case.latest_spec = new_spec
+                flag_modified(test_case, "latest_spec")
+                test_case.current_version += 1
+                version = TestCaseVersion(
+                    test_case_id=test_case.id,
+                    version_number=test_case.current_version,
+                    spec_snapshot=new_spec,
+                    change_summary=f"Self-healed step {repair.step_number} locator to {repair.suggested_locator}",
+                    changed_by_user_id=membership.user_id
+                )
+                db.add(version)
+
+    await db.commit()
+    await db.refresh(repair)
+    return repair

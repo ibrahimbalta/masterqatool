@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Text, ForeignKey, JSON, Integer, BigInteger, DateTime
+from sqlalchemy import Column, String, Text, ForeignKey, JSON, Integer, Float, BigInteger, DateTime
 from sqlalchemy.orm import relationship
 from services.api.app.db.session import Base
 from services.api.app.models.base import GUID, TimestampMixin
@@ -38,6 +38,7 @@ class TestResult(Base, TimestampMixin):
     test_case = relationship("TestCase", back_populates="results")
     steps = relationship("TestStep", back_populates="test_result", cascade="all, delete-orphan")
     artifacts = relationship("Artifact", back_populates="test_result", cascade="all, delete-orphan")
+    locator_repairs = relationship("LocatorRepair", back_populates="test_result", cascade="all, delete-orphan")
 
 class TestStep(Base, TimestampMixin):
     __tablename__ = "test_steps"
@@ -67,3 +68,19 @@ class Artifact(Base, TimestampMixin):
     file_size_bytes = Column(BigInteger, default=0, nullable=False)
 
     test_result = relationship("TestResult", back_populates="artifacts")
+
+class LocatorRepair(Base, TimestampMixin):
+    __tablename__ = "locator_repairs"
+
+    id = Column(GUID, primary_key=True, default=uuid.uuid4)
+    test_result_id = Column(GUID, ForeignKey("test_results.id", ondelete="CASCADE"), nullable=False, index=True)
+    test_case_id = Column(GUID, ForeignKey("test_cases.id", ondelete="CASCADE"), nullable=False, index=True)
+    step_number = Column(Integer, nullable=False)
+    original_locator = Column(String(512), nullable=False)
+    suggested_locator = Column(String(512), nullable=False)
+    strategy = Column(String(50), nullable=False)  # getByRole, getByLabel, getByPlaceholder, getByTestId, css
+    confidence_score = Column(Float, nullable=False)
+    dom_snippet = Column(Text, nullable=True)
+    status = Column(String(50), default="pending", nullable=False)  # pending, approved, rejected, applied
+
+    test_result = relationship("TestResult", back_populates="locator_repairs")

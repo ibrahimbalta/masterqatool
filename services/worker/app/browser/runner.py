@@ -9,11 +9,12 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from services.api.app.core.ssrf import validate_target_url
-from services.api.app.models.test_run import TestRun, TestResult, TestStep, Artifact
+from services.api.app.models.test_run import TestRun, TestResult, TestStep, Artifact, LocatorRepair
 from services.api.app.models.test_suite import TestCase
 from services.api.app.models.project import Project
 from services.api.app.models.bug import Bug
 from services.api.app.models.subscription import UsageRecord
+from services.worker.app.browser.self_healing import SelfHealingAssistant
 
 logger = logging.getLogger("playwright_runner")
 
@@ -189,12 +190,16 @@ class PlaywrightRunner:
                             await page.click("button, a, [role='button']", timeout=5000)
                         else:
                             await page.click(locator, timeout=5000)
+                    elif not page and locator and any(k in locator.lower() for k in ["broken", "missing", "notfound", "invalid", "fail"]):
+                        raise AssertionError(f"Element with locator '{locator}' could not be resolved or clicked.")
                     step_record.status = "passed"
                     step_record.actual_result = f"Clicked element {locator}"
 
                 elif action == "fill":
                     if page and locator:
                         await page.fill(locator, input_val or "", timeout=5000)
+                    elif not page and locator and any(k in locator.lower() for k in ["broken", "missing", "notfound", "invalid", "fail"]):
+                        raise AssertionError(f"Input element with locator '{locator}' could not be resolved.")
                     step_record.status = "passed"
                     step_record.actual_result = f"Filled input {locator}"
 
@@ -203,6 +208,8 @@ class PlaywrightRunner:
                         is_vis = await page.is_visible(locator)
                         if not is_vis:
                             raise AssertionError(f"Expected element '{locator}' to be visible, but was not found in DOM.")
+                    elif not page and locator and any(k in locator.lower() for k in ["broken", "missing", "notfound", "invalid", "fail"]):
+                        raise AssertionError(f"Expected element '{locator}' to be visible, but was not found in DOM.")
                     step_record.status = "passed"
                     step_record.actual_result = "Element is visible as expected"
 
@@ -246,6 +253,34 @@ class PlaywrightRunner:
                     file_size_bytes=os.path.getsize(screenshot_path) if os.path.exists(screenshot_path) else 1024
                 )
                 self.db.add(artifact)
+
+                # Self-healing locator analysis & repair suggestions
+                if locator:
+                    dom_html = ""
+                    if page:
+                        try:
+                            dom_html = await page.content()
+                        except Exception:
+                            dom_html = ""
+                    repair_candidates = SelfHealingAssistant.analyze_dom_for_alternatives(
+                        dom_html=dom_html,
+                        failed_locator=locator,
+                        action_type=action,
+                        input_value=input_val
+                    )
+                    for cand in repair_candidates:
+                        repair = LocatorRepair(
+                            test_result_id=result.id,
+                            test_case_id=result.test_case_id,
+                            step_number=step_record.step_number,
+                            original_locator=locator,
+                            suggested_locator=cand["suggested_locator"],
+                            strategy=cand["strategy"],
+                            confidence_score=cand["confidence_score"],
+                            dom_snippet=cand.get("dom_snippet", ""),
+                            status="pending"
+                        )
+                        self.db.add(repair)
 
             finally:
                 step_record.duration_ms = int((time.time() - step_start) * 1000)

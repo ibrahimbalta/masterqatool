@@ -74,3 +74,80 @@ async def list_members(
             )
         )
     return members
+
+@router.post("/{org_id}/members", response_model=OrgMemberRead, status_code=status.HTTP_201_CREATED)
+async def add_member(
+    org_id: uuid.UUID,
+    member_in: OrgMemberAdd,
+    membership: OrganizationMember = Depends(require_role(["owner", "admin"])),
+    db: AsyncSession = Depends(get_db)
+):
+    if membership.organization_id != org_id:
+        raise HTTPException(status_code=403, detail="Unauthorized access to organization")
+
+    user_res = await db.execute(select(User).where(User.email == member_in.email))
+    target_user = user_res.scalar_one_or_none()
+    if not target_user:
+        from services.api.app.core.security import get_password_hash
+        target_user = User(
+            email=member_in.email,
+            hashed_password=get_password_hash("Welcome123!"),
+            full_name=member_in.email.split("@")[0].capitalize(),
+            is_active=True
+        )
+        db.add(target_user)
+        await db.flush()
+
+    existing = await db.execute(
+        select(OrganizationMember).where(
+            OrganizationMember.organization_id == org_id,
+            OrganizationMember.user_id == target_user.id
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="User is already a member of this organization")
+
+    new_member = OrganizationMember(
+        organization_id=org_id,
+        user_id=target_user.id,
+        role=member_in.role
+    )
+    db.add(new_member)
+    await db.commit()
+    await db.refresh(new_member)
+
+    return OrgMemberRead(
+        id=new_member.id,
+        user_id=target_user.id,
+        email=target_user.email,
+        full_name=target_user.full_name,
+        role=new_member.role,
+        created_at=new_member.created_at
+    )
+
+@router.delete("/{org_id}/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_member(
+    org_id: uuid.UUID,
+    member_id: uuid.UUID,
+    membership: OrganizationMember = Depends(require_role(["owner", "admin"])),
+    db: AsyncSession = Depends(get_db)
+):
+    if membership.organization_id != org_id:
+        raise HTTPException(status_code=403, detail="Unauthorized access to organization")
+
+    mem_res = await db.execute(
+        select(OrganizationMember).where(
+            OrganizationMember.id == member_id,
+            OrganizationMember.organization_id == org_id
+        )
+    )
+    target_membership = mem_res.scalar_one_or_none()
+    if not target_membership:
+        raise HTTPException(status_code=404, detail="Organization member not found")
+
+    if target_membership.role == "owner":
+        raise HTTPException(status_code=400, detail="Cannot remove organization owner")
+
+    await db.delete(target_membership)
+    await db.commit()
+    return None
