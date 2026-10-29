@@ -380,6 +380,183 @@ async def seed():
                 reference_id=str(project.id)
             )
             session.add_all([usage1, usage2])
+            await session.commit()
+            print("Acme demo data seeded successfully!")
+
+        # 9. Create Project: HAS-TAT Aktar & Kuruyemiş
+        hastat_res = await session.execute(
+            select(Project).where(Project.organization_id == org.id, Project.name == "HAS-TAT Aktar & Kuruyemiş")
+        )
+        hastat = hastat_res.scalar_one_or_none()
+        if not hastat:
+            print("Creating Project: HAS-TAT Aktar & Kuruyemiş ...")
+            hastat = Project(
+                organization_id=org.id,
+                name="HAS-TAT Aktar & Kuruyemiş",
+                description="Doğal Şifa & Taze Kavrum Lezzetler - Bartın E-Ticaret ve Ürün Kataloğu Web Uygulaması",
+                target_url="https://ibrahimbalta.github.io/hastat/",
+                github_repo="https://github.com/ibrahimbalta/hastat",
+                environment="production",
+                status="active"
+            )
+            session.add(hastat)
+            await session.flush()
+
+            # Discovered pages for HAS-TAT
+            hastat_scan = ProjectScan(
+                project_id=hastat.id,
+                scan_type="url_crawler",
+                status="completed",
+                started_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(timezone.utc),
+                summary={"pages_discovered": 4, "forms_detected": 1}
+            )
+            session.add(hastat_scan)
+            await session.flush()
+
+            hp1 = DiscoveredPage(
+                scan_id=hastat_scan.id,
+                project_id=hastat.id,
+                url="https://ibrahimbalta.github.io/hastat/",
+                path="/",
+                http_status=200,
+                title="HAS-TAT Aktar & Kuruyemiş | Doğal Şifa & Taze Kavrum Lezzetler",
+                forms_detected=[{
+                    "form_id": "search-form",
+                    "action": "#",
+                    "method": "GET",
+                    "fields": [{"name": "q", "type": "text", "required": False, "recommended_locator": "input[placeholder*='Ürün ara']"}],
+                    "inputs": [{"name": "q", "type": "text", "required": False, "recommended_locator": "input[placeholder*='Ürün ara']"}],
+                    "buttons": [{"text": "Ara", "type": "submit"}]
+                }],
+                accessibility_tree={"role": "main", "name": "HAS-TAT Katalog"},
+                provenance="observed"
+            )
+            hp2 = DiscoveredPage(
+                scan_id=hastat_scan.id,
+                project_id=hastat.id,
+                url="https://ibrahimbalta.github.io/hastat/#/kuruyemis",
+                path="/#/kuruyemis",
+                http_status=200,
+                title="Taze Kavrum Kuruyemişler — HAS-TAT",
+                forms_detected=[],
+                accessibility_tree={"role": "region", "name": "Kuruyemiş Listesi"},
+                provenance="observed"
+            )
+            session.add_all([hp1, hp2])
+
+            # Test Cases for HAS-TAT
+            tc_h1 = TestCase(
+                project_id=hastat.id,
+                code_identifier="TC-HASTAT-001",
+                title="Ürün Arama ve Listeleme Fonksiyon Testi",
+                objective="Kullanıcının arama çubuğuna 'Ihlamur' yazarak ürünü anında filtreleyebildiğini doğrular.",
+                category="functional",
+                priority="high",
+                risk_level="medium",
+                automation_status="automated",
+                approval_status="approved",
+                current_version=1,
+                ai_confidence_score=0.98,
+                provenance="ai_inferred",
+                latest_spec={
+                    "preconditions": ["HAS-TAT anasayfası açılmış olmalı"],
+                    "steps": [
+                        {"step_number": 1, "action_type": "goto", "target_locator": "https://ibrahimbalta.github.io/hastat/", "expected_result": "Sayfa HTTP 200 ile yüklenir"},
+                        {"step_number": 2, "action_type": "fill", "target_locator": "input[type='text'], input[placeholder*='ara' i]", "input_value": "Ihlamur", "expected_result": "Arama kutusuna Ihlamur yazılır"},
+                        {"step_number": 3, "action_type": "assert_visible", "target_locator": "text=Ihlamur", "expected_result": "Ihlamur ürünü ekranda listelenir"}
+                    ],
+                    "expected_result": "İlgili şifalı bitki ürün kartı başarıyla filtrelenir"
+                }
+            )
+            tc_h2 = TestCase(
+                project_id=hastat.id,
+                code_identifier="TC-HASTAT-002",
+                title="Kategori Filtreleme Doğrulaması",
+                objective="Kuruyemiş veya Şifalı Bitkiler kategorisi seçildiğinde doğru ürün grubunun gösterilmesi.",
+                category="smoke",
+                priority="high",
+                risk_level="low",
+                automation_status="automated",
+                approval_status="approved",
+                current_version=1,
+                ai_confidence_score=0.95,
+                provenance="observed",
+                latest_spec={
+                    "preconditions": ["Katalog ekranı aktif"],
+                    "steps": [
+                        {"step_number": 1, "action_type": "goto", "target_locator": "https://ibrahimbalta.github.io/hastat/", "expected_result": "Anasayfa açılır"},
+                        {"step_number": 2, "action_type": "click", "target_locator": "button:has-text('Kuruyemiş'), nav a:has-text('Kuruyemiş')", "expected_result": "Kategoriye tıklanır"},
+                        {"step_number": 3, "action_type": "assert_visible", "target_locator": "text=Fındık, text=Badem, text=Kavrum", "expected_result": "Kuruyemiş ürünleri listelenir"}
+                    ],
+                    "expected_result": "Filtrelenen kategori ürünleri eksiksiz gösterilir"
+                }
+            )
+            tc_h3 = TestCase(
+                project_id=hastat.id,
+                code_identifier="TC-HASTAT-003",
+                title="Geçersiz Ürün Arama Negatif Testi",
+                objective="Veritabanında bulunmayan bir terim arandığında uygulamanın hata vermeden boş durum bildirmesi.",
+                category="negative",
+                priority="medium",
+                risk_level="medium",
+                automation_status="automated",
+                approval_status="approved",
+                current_version=1,
+                ai_confidence_score=0.94,
+                provenance="ai_inferred",
+                latest_spec={
+                    "preconditions": ["HAS-TAT arama çubuğu görünür olmalı"],
+                    "steps": [
+                        {"step_number": 1, "action_type": "goto", "target_locator": "https://ibrahimbalta.github.io/hastat/", "expected_result": "Sayfa açılır"},
+                        {"step_number": 2, "action_type": "fill", "target_locator": "input[type='text'], input[placeholder*='ara' i]", "input_value": "asdfghjkl999", "expected_result": "Anlamsız kelime yazılır"},
+                        {"step_number": 3, "action_type": "assert_visible", "target_locator": "body", "expected_result": "Sayfa çökmez, boş sonuç güvenle işlenir"}
+                    ],
+                    "expected_result": "Sayfa stabil kalır, JavaScript istisnası fırlatılmaz"
+                }
+            )
+            session.add_all([tc_h1, tc_h2, tc_h3])
+            await session.flush()
+
+            # Test Suite for HAS-TAT
+            h_suite = TestSuite(
+                project_id=hastat.id,
+                name="HAS-TAT E2E Regresyon Paketi",
+                description="HAS-TAT web sitesinin vitrin, arama ve gezinme akışlarını denetleyen tam otomasyon paketi.",
+                category="smoke"
+            )
+            h_suite.test_cases.extend([tc_h1, tc_h2, tc_h3])
+            session.add(h_suite)
+
+            # Test Run for HAS-TAT
+            h_run = TestRun(
+                project_id=hastat.id,
+                organization_id=org.id,
+                trigger="manual",
+                status="completed",
+                passed_cases=3,
+                failed_cases=0,
+                started_at=datetime.now(timezone.utc),
+                completed_at=datetime.now(timezone.utc),
+                duration_ms=4210
+            )
+            session.add(h_run)
+            await session.flush()
+
+            for idx, tc_item in enumerate([tc_h1, tc_h2, tc_h3], 1):
+                res_item = TestResult(
+                    test_run_id=h_run.id,
+                    test_case_id=tc_item.id,
+                    status="passed",
+                    duration_ms=1300 + (idx * 150)
+                )
+                session.add(res_item)
+                await session.flush()
+
+                s1 = TestStep(test_result_id=res_item.id, step_number=1, action_type="goto", target_locator="https://ibrahimbalta.github.io/hastat/", status="passed", duration_ms=800)
+                s2 = TestStep(test_result_id=res_item.id, step_number=2, action_type="fill", target_locator="input[type='text']", status="passed", duration_ms=250)
+                s3 = TestStep(test_result_id=res_item.id, step_number=3, action_type="assert_visible", target_locator="text=Ihlamur", status="passed", duration_ms=250)
+                session.add_all([s1, s2, s3])
 
             await session.commit()
             print("Demo data seeded successfully!")

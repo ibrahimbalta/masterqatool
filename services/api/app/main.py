@@ -34,6 +34,12 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database schemas verified.")
+    try:
+        from scripts.seed_demo_data import seed
+        await seed()
+        logger.info("Initial seed data verified.")
+    except Exception as e:
+        logger.warning(f"Auto-seed skipped: {e}")
     yield
     logger.info("Shutting down AI QA Agent API...")
     await engine.dispose()
@@ -50,7 +56,7 @@ app = FastAPI(
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS or ["*"],
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

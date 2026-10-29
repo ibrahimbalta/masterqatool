@@ -1,7 +1,10 @@
 export const getApiBase = (): string => {
   if (typeof window !== 'undefined') {
+    // When running on GitHub Pages (e.g. ibrahimbalta.github.io), connect to the live Render backend
+    if (window.location.hostname.includes('github.io')) {
+      return 'https://masterqa-api.onrender.com/api/v1';
+    }
     // When running in browser (Codespaces, Vercel, localhost):
-    // Use relative path so Next.js rewrites proxy requests directly to backend without CORS or mixed-content issues
     if (process.env.NEXT_PUBLIC_API_URL && !process.env.NEXT_PUBLIC_API_URL.includes('localhost')) {
       return process.env.NEXT_PUBLIC_API_URL;
     }
